@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Sales Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .hidden { display: none !important; }
+        .readonly-bg { background-color: #e9ecef; }
+    </style>
+</head>
+<body class="bg-light">
+
+    <!-- LOGIN -->
+    <div id="loginSection" class="container mt-5" style="max-width: 400px;">
+        <div class="card shadow">
+            <div class="card-body">
+                <h4 class="text-center mb-4">Login Sales</h4>
+                <input type="text" id="loginUser" class="form-control mb-3" placeholder="Username">
+                <input type="password" id="loginPass" class="form-control mb-3" placeholder="Password">
+                <button onclick="login()" class="btn btn-primary w-100" id="btnLogin">Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="appSection" class="container mt-4 hidden">
+        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+            <h4>Halo, <span id="staffName" class="text-primary fw-bold"></span>!</h4>
+            <div>
+                <button onclick="showMenu('form')" class="btn btn-primary btn-sm">Input Form</button>
+                <button onclick="showMenu('admin')" id="btnAdmin" class="btn btn-warning btn-sm hidden">Menu Admin</button>
+                <button onclick="logout()" class="btn btn-danger btn-sm">Logout</button>
+            </div>
+        </div>
+
+        <!-- FORM INPUT -->
+        <div id="formMenu" class="card shadow p-4">
+            <form id="salesForm" onsubmit="submitData(event)">
+                <div class="row mb-3 border-bottom pb-3">
+                    <div class="col-md-6">
+                        <label class="fw-bold">Pilih Tanggal Input:</label>
+                        <input type="date" id="inputDate" class="form-control border-primary" onchange="checkDate()" required>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-info py-2 mt-4 mb-0">Pajak Saat Ini: <b id="infoPajak">0</b>% | Target: Rp <b id="infoTarget">0</b></div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-2 mb-3"><label>Sales Input</label><input type="number" id="salesInput" class="form-control"></div>
+                    <div class="col-md-2 mb-3"><label>Internal View</label><input type="number" id="internalView" class="form-control"></div>
+                    <div class="col-md-2 mb-3"><label>Cust View</label><input type="number" id="customerView" class="form-control"></div>
+                    <div class="col-md-3 mb-3"><label>Total View</label><input type="number" id="totalView" class="form-control"></div>
+                    <div class="col-md-3 mb-3"><label>Total Chats</label><input type="number" id="totalChats" class="form-control"></div>
+                </div>
+
+                <div class="mb-3 mt-3">
+                    <label class="fw-bold text-danger">Pilih Channel (Pilih 1 per 1 untuk diinput):</label>
+                    <select id="channelSelect" class="form-select border-danger" onchange="toggleFields()" required>
+                        <option value="">-- Pilih Channel --</option>
+                        <option value="TAB">TAB</option>
+                        <option value="Rupa">Rupa-Rupa (ODI)</option>
+                        <option value="Shopee">Shopee (ODIS)</option>
+                        <option value="Storemode">Storemode (ODIR)</option>
+                        <option value="Tokopedia">Tokopedia (ODIT)</option>
+                        <option value="TikTok">TikTok (ODIK)</option>
+                        <option value="Grab">Grab Mart (GM)</option>
+                        <option value="Project">Project</option>
+                    </select>
+                </div>
+
+                <div id="dynamicFields" class="p-3 bg-white border rounded hidden shadow-sm">
+                    <h6 id="channelTitle" class="text-primary mb-3"></h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label>Trx</label>
+                            <input type="number" id="dynTrx" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label>Sales</label>
+                            <input type="number" id="dynSales" class="form-control" oninput="calculateNet()" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label>Net Sales (Otomatis)</label>
+                            <input type="number" id="dynNetSales" class="form-control readonly-bg" readonly>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" id="btnSubmit" class="btn btn-success w-100 mt-4 py-2 fw-bold">Simpan & Kalkulasi Sistem</button>
+            </form>
+        </div>
+
+        <!-- ADMIN MENU -->
+        <div id="adminMenu" class="card shadow p-4 hidden">
+            <h5 class="text-warning fw-bold mb-4">Admin Dashboard</h5>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label>Setting Pajak (%)</label>
+                    <input type="number" id="setPajak" class="form-control">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label>Setting Target Monthly (Rp)</label>
+                    <input type="number" id="setTarget" class="form-control">
+                </div>
+            </div>
+            <button onclick="saveAdmin()" id="btnSaveAdmin" class="btn btn-warning w-100">Simpan Pengaturan</button>
+        </div>
+    </div>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxSZ2Aq7VDIjFJoL6w43W9_OtGxKkMYy1l1nMw3KJrEtq-xba5d40_AubcquXU9y6r1/exec'; 
+        let currentPajak = 0;
+        let todayStr = new Date().toISOString().split('T')[0];
+
+        window.onload = () => {
+            document.getElementById('inputDate').value = todayStr;
+            const user = localStorage.getItem("loggedInUser");
+            const role = localStorage.getItem("userRole");
+            if (user) {
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('appSection').classList.remove('hidden');
+                document.getElementById('staffName').innerText = user;
+                if(role === 'Admin') document.getElementById('btnAdmin').classList.remove('hidden');
+                initData(todayStr);
+            }
+        };
+
+        function login() {
+            const u = document.getElementById('loginUser').value;
+            const p = document.getElementById('loginPass').value;
+            document.getElementById('btnLogin').innerText = 'Loading...';
+
+            fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "login", username: u, password: p }) })
+            .then(res => res.json()).then(data => {
+                if (data.status === "success") {
+                    localStorage.setItem("loggedInUser", data.user);
+                    localStorage.setItem("userRole", data.role);
+                    location.reload();
+                } else {
+                    alert(data.message);
+                    document.getElementById('btnLogin').innerText = 'Login';
+                }
+            });
+        }
+
+        function logout() { localStorage.clear(); location.reload(); }
+
+        function showMenu(menu) {
+            document.getElementById('formMenu').classList.add('hidden');
+            document.getElementById('adminMenu').classList.add('hidden');
+            if (menu === 'form') document.getElementById('formMenu').classList.remove('hidden');
+            if (menu === 'admin') document.getElementById('adminMenu').classList.remove('hidden');
+        }
+
+        // AMBIL DATA AWAL & CEK TANGGAL
+        function initData(selectedDate) {
+            fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "getInitData", username: localStorage.getItem("loggedInUser"), date: selectedDate }) })
+            .then(res => res.json()).then(data => {
+                currentPajak = parseFloat(data.pajak);
+                document.getElementById('infoPajak').innerText = currentPajak;
+                document.getElementById('infoTarget').innerText = data.target.toLocaleString();
+                document.getElementById('setPajak').value = currentPajak;
+                document.getElementById('setTarget').value = data.target;
+
+                // Jika data di tanggal tersebut sudah ada
+                if(data.existingData) {
+                    let c = confirm("Data untuk tanggal " + selectedDate + " SUDAH ADA.\nApakah Anda ingin menambahkan/mengubah channel pada hari tersebut?");
+                    if(c) {
+                        // Isi form general view agar tidak hilang saat update
+                        document.getElementById('salesInput').value = data.existingData[3] || "";
+                        document.getElementById('internalView').value = data.existingData[4] || "";
+                        document.getElementById('customerView').value = data.existingData[5] || "";
+                        document.getElementById('totalView').value = data.existingData[6] || "";
+                        document.getElementById('totalChats').value = data.existingData[7] || "";
+                    } else {
+                        document.getElementById('inputDate').value = todayStr; // Kembalikan ke hari ini
+                    }
+                }
+            });
+        }
+
+        // TRIGGER POPUP TANGGAL BEDA HARI
+        function checkDate() {
+            let selected = document.getElementById('inputDate').value;
+            if(selected !== todayStr) {
+                let c = confirm("Anda memilih tanggal yang BUKAN HARI INI ("+selected+").\nApakah Anda Yakin?");
+                if(!c) { document.getElementById('inputDate').value = todayStr; selected = todayStr; }
+            }
+            // Reset form channel
+            document.getElementById('salesForm').reset();
+            document.getElementById('inputDate').value = selected; 
+            document.getElementById('dynamicFields').classList.add('hidden');
+            initData(selected);
+        }
+
+        function toggleFields() {
+            const channel = document.getElementById('channelSelect').value;
+            const dynDiv = document.getElementById('dynamicFields');
+            if (channel === "") { dynDiv.classList.add('hidden'); return; }
+            
+            dynDiv.classList.remove('hidden');
+            document.getElementById('channelTitle').innerText = "Input Data: " + channel;
+            document.getElementById('dynTrx').value = "";
+            document.getElementById('dynSales').value = "";
+            document.getElementById('dynNetSales').value = "";
+        }
+
+        // AUTO CALCULATION NET SALES (DI KURANGI PAJAK)
+        function calculateNet() {
+            let sales = parseFloat(document.getElementById('dynSales').value) || 0;
+            let net = sales - (sales * (currentPajak / 100));
+            document.getElementById('dynNetSales').value = net;
+        }
+
+        function saveAdmin() {
+            let btn = document.getElementById('btnSaveAdmin'); btn.innerText = "Menyimpan...";
+            let p = document.getElementById('setPajak').value;
+            let t = document.getElementById('setTarget').value;
+            fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "updateSettings", username: localStorage.getItem("loggedInUser"), pajak: p, target: t }) })
+            .then(res => res.json()).then(data => { alert(data.message); initData(todayStr); btn.innerText = "Simpan Pengaturan"; });
+        }
+
+        function submitData(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnSubmit');
+            btn.innerText = "Menyimpan & Mengkalkulasi..."; btn.disabled = true;
+
+            let payload = {
+                action: "submit",
+                username: localStorage.getItem("loggedInUser"),
+                date: document.getElementById('inputDate').value,
+                channel: document.getElementById('channelSelect').value,
+                salesInput: document.getElementById('salesInput').value,
+                internalView: document.getElementById('internalView').value,
+                customerView: document.getElementById('customerView').value,
+                totalView: document.getElementById('totalView').value,
+                totalChats: document.getElementById('totalChats').value,
+                trx: document.getElementById('dynTrx').value,
+                sales: document.getElementById('dynSales').value,
+                netSales: document.getElementById('dynNetSales').value
+            };
+
+            fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
+            .then(res => res.json()).then(data => {
+                alert(data.message + "\n(Daily, Monthly, dan Target telah otomatis terupdate di database)");
+                document.getElementById('channelSelect').value = "";
+                document.getElementById('dynamicFields').classList.add('hidden');
+                btn.innerText = "Simpan & Kalkulasi Sistem"; btn.disabled = false;
+            }).catch(() => { alert("Error"); btn.disabled = false; });
+        }
+    </script>
+</body>
+</html>
