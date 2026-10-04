@@ -4,13 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sales App iOS</title>
-    <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     
     <style>
-        /* iOS STYLE UI */
         :root {
             --ios-bg: #f2f2f7; --ios-card: #ffffff; --ios-blue: #007aff;
             --ios-text: #1c1c1e; --ios-gray: #8e8e93;
@@ -52,7 +49,6 @@
         .h-date { font-weight: 600; font-size: 16px; }
         .h-sub { font-size: 13px; color: var(--ios-gray); margin-top: 4px;}
         
-        /* Modal Info Data CSS Custom */
         .info-detail b { color: #333; }
         .info-detail { text-align: left; font-size: 14px; line-height: 1.6; color: #555;}
     </style>
@@ -132,7 +128,6 @@
                         <button type="button" class="ios-chip" onclick="toggleChannel('Project')">Project</button>
                     </div>
 
-                    <!-- Wadah Dinamis untuk Multi Channel -->
                     <div id="multiChannelForms"></div>
 
                     <button type="submit" id="btnSubmit" class="ios-btn" style="margin-top: 20px;">Simpan & Kalkulasi</button>
@@ -145,11 +140,9 @@
             <div class="ios-card" style="padding: 0; overflow: hidden;">
                 <div style="padding: 20px; background: #f9f9f9; border-bottom: 1px solid #e5e5ea;">
                     <h4 style="margin: 0; font-size: 18px;">Riwayat Input Anda</h4>
-                    <span style="font-size: 12px; color: var(--ios-gray);">Ketuk untuk melihat detail atau mengedit.</span>
+                    <span style="font-size: 12px; color: var(--ios-gray);">Ketuk untuk melihat, edit, atau hapus data.</span>
                 </div>
-                <div id="historyList">
-                    <!-- Data history dirender di sini -->
-                </div>
+                <div id="historyList"></div>
             </div>
         </div>
 
@@ -182,11 +175,12 @@
     <!-- JAVASCRIPT LOGIC -->
     <script>
         // GANTI DENGAN URL WEB APP TERBARU ANDA
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxfrveXFa_ltOBtLrHLMnOGJdmm_bPFFrl47SANh8ctoN1T6oFp0bvp768zme9FBDMw/exec'; 
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyk13RjhJmP-GmEfGIN-h5DLQ9MZ-PCZTUj2SDN-1DOmfXARW20UUX63KPI_BJu8rBM/exec'; 
         
         let currentPajak = 0;
         let todayStr = new Date().toISOString().split('T')[0];
         let activeChannels = []; 
+        let hasExistingDataOnForm = false; // Penanda untuk memunculkan Popup Replace
 
         window.onload = () => {
             document.getElementById('inputDate').value = todayStr;
@@ -203,12 +197,10 @@
             }
         };
 
-        // --- SISTEM POPUP (SWEETALERT2) ---
         function alertIOS(title, text, icon="info") {
             return Swal.fire({ title: title, text: text, icon: icon, confirmButtonText: 'Oke', confirmButtonColor: '#007aff' });
         }
 
-        // --- FUNGSI FORMAT ANGKA (TITIK RIBUAN) ---
         function formatRibuan(obj) {
             let val = obj.value.replace(/[^0-9]/g, '');
             obj.value = val ? parseInt(val, 10).toLocaleString('id-ID') : "";
@@ -218,9 +210,7 @@
             return parseInt(str.toString().replace(/[^0-9]/g, '')) || 0;
         }
 
-        // --- FUNGSI API FETCH (MENCEGAH CORS BLOCKED) ---
         function apiCall(payload) {
-            // Menggunakan Content-Type text/plain agar bebas dari CORS Preflight
             return fetch(SCRIPT_URL, {
                 redirect: "follow",
                 method: 'POST',
@@ -256,25 +246,21 @@
             }).then((result) => { if (result.isConfirmed) { localStorage.clear(); location.reload(); } });
         }
 
-        // --- TAB NAVIGATION ---
         function switchTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
-            
             document.getElementById('tab' + tabName).classList.remove('hidden');
             document.getElementById('nav' + tabName).classList.add('active');
-
             if (tabName === 'History') loadHistory();
         }
 
-        // --- AUTO KALKULASI TOTAL VIEW ---
         function calcTotalView() {
             let iv = getInt(document.getElementById('internalView').value);
             let cv = getInt(document.getElementById('customerView').value);
             document.getElementById('totalView').value = (iv + cv).toLocaleString('id-ID');
         }
 
-        // --- FETCH INIT DATA & CEK TANGGAL ---
+        // --- FETCH INIT DATA & CEK TANGGAL DARI FORM ---
         function initData(selectedDate) {
             apiCall({ action: "getInitData", username: localStorage.getItem("loggedInUser"), date: selectedDate })
             .then(data => {
@@ -285,36 +271,35 @@
                 document.getElementById('setTarget').value = parseFloat(data.target).toLocaleString('id-ID');
 
                 if(data.existingData) {
-                    Swal.fire({
-                        title: 'Data Ditemukan', text: `Anda sudah memiliki data di tanggal ${selectedDate}. Ingin mengubah atau menambah data channel?`, icon: 'question',
-                        showCancelButton: true, confirmButtonText: 'Ya, Ubah/Tambah', cancelButtonText: 'Batal', confirmButtonColor: '#007aff'
-                    }).then((result) => {
-                        if(result.isConfirmed) {
-                            fillFormWithExistingData(data.existingData);
-                        } else {
-                            document.getElementById('inputDate').value = todayStr;
-                        }
-                    });
+                    hasExistingDataOnForm = true;
+                } else {
+                    hasExistingDataOnForm = false;
                 }
             });
         }
 
         function checkDate() {
             let selected = document.getElementById('inputDate').value;
-            if (selected !== todayStr) {
-                Swal.fire({
-                    title: 'Tanggal Berbeda', text: `Anda memilih tanggal selain hari ini (${selected}). Yakin?`, icon: 'warning',
-                    showCancelButton: true, confirmButtonText: 'Lanjutkan', cancelButtonText: 'Batal', confirmButtonColor: '#ff9500'
-                }).then((r) => {
-                    if(!r.isConfirmed) document.getElementById('inputDate').value = todayStr;
-                    resetForm(); initData(document.getElementById('inputDate').value);
-                });
-            } else {
-                resetForm(); initData(selected);
-            }
+            resetForm();
+            
+            apiCall({ action: "getInitData", username: localStorage.getItem("loggedInUser"), date: selected })
+            .then(data => {
+                if (data.existingData) {
+                    hasExistingDataOnForm = true;
+                    Swal.fire({
+                        title: 'Data Ditemukan', text: `Data di tanggal ${selected} sudah ada. Load data ini untuk diedit?`, icon: 'question',
+                        showCancelButton: true, confirmButtonText: 'Load Data', cancelButtonText: 'Batal (Buat Baru)', confirmButtonColor: '#007aff'
+                    }).then((result) => {
+                        if(result.isConfirmed) {
+                            fillFormWithExistingData(data.existingData);
+                        }
+                    });
+                } else {
+                    hasExistingDataOnForm = false;
+                }
+            });
         }
 
-        // --- LOGIKA MULTI CHANNEL ---
         function toggleChannel(channel) {
             let chips = document.querySelectorAll('.ios-chip');
             let chip;
@@ -334,7 +319,7 @@
         function renderChannelForm(channel) {
             let container = document.getElementById('multiChannelForms');
             let div = document.createElement('div');
-            let safeId = channel.replace(/[^a-zA-Z]/g, ''); // Buang spasi/kurung untuk ID HTML
+            let safeId = channel.replace(/[^a-zA-Z]/g, ''); 
             div.className = 'channel-block';
             div.id = 'form_' + safeId;
             
@@ -364,11 +349,29 @@
             document.getElementById(`net_${safeId}`).value = Math.round(net).toLocaleString('id-ID');
         }
 
-        // --- SUBMIT MULTI DATA ---
+        // --- SUBMIT DENGAN REPLACE POPUP ---
         function submitData(e) {
             e.preventDefault();
-            if(activeChannels.length === 0) { alertIOS("Perhatian", "Pilih minimal 1 channel untuk diinput!", "warning"); return; }
+            if(activeChannels.length === 0) { alertIOS("Perhatian", "Pilih minimal 1 channel!", "warning"); return; }
             
+            if (hasExistingDataOnForm) {
+                Swal.fire({
+                    title: 'Timpa Data Lama?',
+                    text: 'Data pada tanggal ini sudah ada. Anda yakin ingin menimpanya (replace) dengan data baru ini?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Replace',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#ff9500'
+                }).then((r) => {
+                    if (r.isConfirmed) executeSubmit();
+                });
+            } else {
+                executeSubmit();
+            }
+        }
+
+        function executeSubmit() {
             let btn = document.getElementById('btnSubmit');
             btn.innerText = "Memproses..."; btn.disabled = true;
 
@@ -395,12 +398,12 @@
 
             apiCall(payload).then(data => {
                 alertIOS("Sukses", data.message, "success");
-                resetForm();
+                hasExistingDataOnForm = true; // Set menjadi true setelah disave agar klik simpan lg memunculkan replace
                 btn.innerText = "Simpan & Kalkulasi"; btn.disabled = false;
             }).catch(() => { alertIOS("Error", "Gagal menghubungi server", "error"); btn.disabled = false; });
         }
 
-        // --- HISTORY MENU ---
+        // --- HISTORY MENU & DELETE FUNCTION ---
         function loadHistory() {
             let container = document.getElementById('historyList');
             container.innerHTML = "<div style='padding:20px;text-align:center;'>Memuat data...</div>";
@@ -431,16 +434,15 @@
             });
         }
 
-        // Menampilkan Info sebelum di edit
         function viewHistory(rowDataStr) {
             let rowData = JSON.parse(rowDataStr);
             let dateStr = rowData[1];
             
             let htmlContent = `<div class="info-detail">`;
-            htmlContent += `<b>Internal View:</b> ${rowData[4]||0}<br>`;
-            htmlContent += `<b>Customer View:</b> ${rowData[5]||0}<br>`;
-            htmlContent += `<b>Total View:</b> ${rowData[6]||0}<br>`;
-            htmlContent += `<b>Total Chats:</b> ${rowData[7]||0}<hr style="margin:10px 0;">`;
+            htmlContent += `<b>Internal View:</b> ${(rowData[4]||0).toLocaleString('id-ID')}<br>`;
+            htmlContent += `<b>Customer View:</b> ${(rowData[5]||0).toLocaleString('id-ID')}<br>`;
+            htmlContent += `<b>Total View:</b> ${(rowData[6]||0).toLocaleString('id-ID')}<br>`;
+            htmlContent += `<b>Total Chats:</b> ${(rowData[7]||0).toLocaleString('id-ID')}<hr style="margin:10px 0;">`;
             
             let cMap = { "TAB": 8, "Rupa-Rupa (ODI)": 11, "Shopee (ODIS)": 14, "Storemode (ODIR)": 17, "Tokopedia (ODIT)": 20, "TikTok (ODIK)": 23, "Grab Mart (GM)": 26, "Project": 29 };
             
@@ -459,15 +461,39 @@
                 title: `Detail Data (${dateStr})`,
                 html: htmlContent,
                 showCancelButton: true,
-                confirmButtonText: 'Edit Data',
+                showDenyButton: true,
+                confirmButtonText: 'Edit',
+                denyButtonText: 'Hapus',
                 cancelButtonText: 'Tutup',
                 confirmButtonColor: '#007aff',
+                denyButtonColor: '#ff3b30',
                 cancelButtonColor: '#8e8e93'
             }).then((res) => {
-                if(res.isConfirmed) {
+                if (res.isConfirmed) {
+                    // EDIT
                     document.getElementById('inputDate').value = dateStr;
+                    hasExistingDataOnForm = true; 
                     fillFormWithExistingData(rowData);
                     switchTab('Form');
+                } else if (res.isDenied) {
+                    // HAPUS
+                    Swal.fire({
+                        title: 'Yakin Hapus Data?',
+                        text: "Data yang dihapus tidak dapat dikembalikan!",
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Ya, Hapus!',
+                        confirmButtonColor: '#ff3b30'
+                    }).then((delRes) => {
+                        if(delRes.isConfirmed) {
+                            apiCall({ action: "delete", username: localStorage.getItem("loggedInUser"), date: dateStr })
+                            .then(d => {
+                                alertIOS("Terhapus", d.message, "success");
+                                loadHistory();
+                                if(document.getElementById('inputDate').value === dateStr) { resetForm(); hasExistingDataOnForm = false; }
+                            });
+                        }
+                    });
                 }
             });
         }
